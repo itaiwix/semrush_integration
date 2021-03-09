@@ -1,8 +1,9 @@
 #################
 #### Imports ####
 #################
-import os
+import os.path
 from datetime import datetime
+from pathlib import Path
 
 from ba_infra.presto_connection import WixPrestoConnection
 from google.oauth2 import service_account
@@ -12,10 +13,12 @@ import functions as func
 #####################
 ####  Parameters ####
 #####################
-BQ_CREDENTIALS = service_account.Credentials.from_service_account_file('path_to_your_json', scopes=["https://www.googleapis.com/auth/cloud-platform"])
+DATA_FOLDER = Path(os.getcwd())
 
-API_KEY = func.read_json(path_file='path_to_your_json')['api_key']
-GLOBAL_PARAMETERS = func.read_json(path_file='G:/Shared drives/acquisition/Itaib - Projects/seo/semrush/configuration.json')
+BQ_CREDENTIALS = service_account.Credentials.from_service_account_file(DATA_FOLDER / "key.json", scopes=["https://www.googleapis.com/auth/cloud-platform"])
+API_KEY = func.read_json(path_file=DATA_FOLDER / "key_api.json")['api_key']
+
+GLOBAL_PARAMETERS = func.read_json(path_file=DATA_FOLDER / "configuration.json")
 
 # Set dates
 DATE_MID_MONTH = func.mid_month()   # Data updated two weeks after the end of the month, for the previous month
@@ -109,6 +112,7 @@ del final_df_backlinks_pages['last_seen']
 #### Load data to  BQ  ####
 ###########################
 
-func.load_db(data_frame=final_df_phrase_this, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_TRAFFIC)
-func.load_db(data_frame=final_df_phrase_organic, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_URL_BACKLINKS)
-func.load_db(data_frame=final_df_backlinks_pages, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_SERP_FEATURES_MAP)
+func.load_db(data_frame=final_df_phrase_this, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_TRAFFIC, method='append')
+func.load_db(data_frame=final_df_phrase_organic, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_URL_BACKLINKS, method='append')
+func.load_db(data_frame=final_df_backlinks_pages, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_SERP_FEATURES_MAP, method='append')
+
