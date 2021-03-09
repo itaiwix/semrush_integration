@@ -8,8 +8,6 @@ from datetime import datetime, date, timedelta
 
 import pandas as pd
 import requests
-import urllib
-from urllib.parse import urlparse
 
 ###################
 #### Functions ####
@@ -44,34 +42,22 @@ def mid_month():
 # creates the get request html for the database, separated by the dimension which represents the report type
 def request(dimension, call_type, api_key, features, date_mid_month='null', url='null', domain="null", geo="us",
             service_url="https://api.semrush.com", phrase="null"):
-    if dimension == 'domain':
+    if dimension == 'phrase':
         params = {
-            "type": call_type,
-            'key': api_key,
-            'database': geo,
-            'export_columns': features,
-            'display_date': date_mid_month,
-            'display_limit': '10',
-            'domain': domain,
-        }
-    elif dimension == 'phrase':
-        params = {
-            "type": call_type,
+            'type': call_type,
             'key': api_key,
             'phrase': phrase,
             'database': geo,
             'export_columns': features,
             'display_date': date_mid_month,
-            'display_limit': '10',
         }
     elif dimension == 'url':
         params = {
-            "type": call_type,
+            'type': call_type,
             'key': api_key,
             'target': url,
             'target_type': 'url',
             'export_columns': features,
-            'display_limit': '10',
         }
     response = requests.get(service_url, params=params)
     return response
@@ -191,6 +177,5 @@ def get_last_update_date(table, pc):
     return datetime.strptime(last_update_date, '%Y-%m-%d').date()
 
 # load data into bq table
-def load_db(data_frame, credentials, table):
-    data_frame.to_gbq(credentials=credentials, destination_table=f'{table}', if_exists='append', chunksize=10000)
-
+def load_db(data_frame, credentials, table, method):
+    data_frame.to_gbq(credentials=credentials, destination_table=f'{table}', if_exists=method, chunksize=10000)
