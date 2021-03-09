@@ -1,0 +1,52 @@
+{
+  "report_keyword_overview": {
+    "dimension": "phrase",
+    "service_url": "https://api.semrush.com",
+    "call_type": "phrase_this",
+    "features": "Nq",
+    "final_table_schema": {
+      "database": "varchar",
+      "phrase": "varchar",
+      "traffic": "integer",
+      "display_date": "varchar",
+      "time_updated": "varchar"
+    }
+  },
+  "report_organic_results": {
+    "dimension": "phrase",
+    "service_url": "https://api.semrush.com",
+    "call_type": "phrase_organic",
+    "features": "Dn,Ur,Fp",
+    "feature_mapping": {
+      "0": "instant_answer",
+      "6": "site_links",
+      "11": "featured_snippet",
+      "22": "faq"
+    },
+    "final_table_schema": {
+      "keyword": "varchar",
+      "database": "varchar",
+      "display_date": "varchar",
+      "Domain": "varchar",
+      "Url": "varchar",
+      "instant_answer": "integer",
+      "site_links": "integer",
+      "featured_snippet": "integer",
+      "faq": "integer",
+      "time_updated": "varchar"
+    }
+  },
+  "report_indexed_pages": {
+    "dimension": "url",
+    "service_url": "https://api.semrush.com/analytics/v1/",
+    "call_type": "backlinks_pages",
+    "features": "source_url,backlinks_num,domains_num,last_seen",
+    "final_table_schema": {
+      "source_url": "varchar",
+      "backlinks_num": "integer",
+      "domains_num": "integer",
+      "time_updated": "varchar",
+      "last_seen_date": "varchar"
+    }
+  }
+}
