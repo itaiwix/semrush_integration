@@ -1,52 +1,45 @@
 {
-  "report_keyword_overview": {
-    "dimension": "phrase",
-    "service_url": "https://api.semrush.com",
-    "call_type": "phrase_this",
-    "features": "Nq",
-    "final_table_schema": {
-      "database": "varchar",
-      "phrase": "varchar",
-      "traffic": "integer",
-      "display_date": "varchar",
-      "time_updated": "varchar"
-    }
-  },
-  "report_organic_results": {
-    "dimension": "phrase",
-    "service_url": "https://api.semrush.com",
-    "call_type": "phrase_organic",
-    "features": "Dn,Ur,Fp",
-    "feature_mapping": {
-      "0": "instant_answer",
-      "6": "site_links",
-      "11": "featured_snippet",
-      "22": "faq"
+  "reports": {
+    "report_keyword_overview": {
+      "dimension": "phrase",
+      "service_url": "https://api.semrush.com",
+      "call_type": "phrase_this",
+      "features": "Nq",
+      "feature_mapping": "no_need",
+      "bq_table": "temp.semrush_kw_traffic_delta"
     },
-    "final_table_schema": {
-      "keyword": "varchar",
-      "database": "varchar",
-      "display_date": "varchar",
-      "Domain": "varchar",
-      "Url": "varchar",
-      "instant_answer": "integer",
-      "site_links": "integer",
-      "featured_snippet": "integer",
-      "faq": "integer",
-      "time_updated": "varchar"
+    "report_organic_results": {
+      "dimension": "phrase",
+      "service_url": "https://api.semrush.com",
+      "call_type": "phrase_organic",
+      "features": "Dn,Ur,Fp",
+      "feature_mapping": {
+        "0": "instant_answer",
+        "6": "site_links",
+        "11": "featured_snippet",
+        "22": "faq"
+      },
+      "bq_table": "temp.semrush_url_backlinks_delta"
+    },
+    "report_indexed_pages": {
+      "dimension": "url",
+      "service_url": "https://api.semrush.com/analytics/v1/",
+      "call_type": "backlinks_pages",
+      "features": "source_url,backlinks_num,domains_num,last_seen",
+      "feature_mapping": "no_need",
+      "bq_table": "temp.semrush_kw_serp_features_map_delta"
     }
   },
-  "report_indexed_pages": {
-    "dimension": "url",
-    "service_url": "https://api.semrush.com/analytics/v1/",
-    "call_type": "backlinks_pages",
-    "features": "source_url,backlinks_num,domains_num,last_seen",
-    "final_table_schema": {
-      "source_url": "varchar",
-      "backlinks_num": "integer",
-      "domains_num": "integer",
-      "time_updated": "varchar",
-      "last_seen_date": "varchar"
+  "data_requirements": {
+    "google_sheets": {
+      "keyword": "gdrive.bi.marketing_itaib_semrush_kw_gs",
+      "url": "gdrive.bi.marketing_itaib_semrush_url_gs",
+      "database": "gdrive.bi.marketing_itaib_semrush_database_gs"
+    },
+    "presto_tables": {
+      "keyword": "sandbox.itaib.seo_kw_semrush",
+      "url": "sandbox.itaib.seo_url_semrush",
+      "database": "sandbox.itaib.seo_databases_semrush"
     }
   }
 }
