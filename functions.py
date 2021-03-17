@@ -84,9 +84,9 @@ def parse_response(call_data):
 def get_phrase_data(dimension, call_type, features, service_url, api_key, date_mid_month, kw_list, db_list, current_time, last_update_date):
     if current_time.date() != last_update_date:
         list_container = []
-        for keyword in range(0, len(kw_list)):
+        for keyword in kw_list:
             kw = kw_list[keyword]
-            for database in range(0, len(db_list)):
+            for database in db_list:
                 db = db_list[database]
                 response = request(dimension=dimension, call_type=call_type, api_key=api_key, geo=db,
                                    features=features, service_url=service_url, phrase=kw,
@@ -112,7 +112,7 @@ def get_phrase_data(dimension, call_type, features, service_url, api_key, date_m
 def get_url_data(dimension, call_type, features, service_url, api_key, url_list, current_time, last_update_date):
     if current_time.date() != last_update_date:
         list_container = []
-        for url in range(0, len(url_list)):
+        for url in url_list:
             url = url_list[url]
             response = request(dimension=dimension, call_type=call_type, api_key=api_key, url=url,
                                features=features, service_url=service_url)
@@ -143,9 +143,10 @@ def get_quix_data(sql_script, pc):
     print('Get data from quix')
     try:
         sql_script = sql_script
-        df = pc.execute_sql_pandas(sql_script)
+        list_of_tuples = pc.execute_sql(sql_script)
+        list_of_parameters = [parameter[0] for parameter in list_of_tuples]
         print('Managed to bring data from quix')
-        return df
+        return list_of_parameters
     except:
         raise Exception('Error - functions_general - get_quix_data')
 
@@ -158,6 +159,13 @@ def update_input_tables(create_presto_table, exesting_google_sheet_table):
     select * from {exesting_google_sheet_table};
     '''
     return script
+
+# Get list of needed parameters for querying from users input via google sheet
+def get_query_parameters(input_table, storage_table, pc):
+    script = update_input_tables(create_presto_table=storage_table, exesting_google_sheet_table=input_table)
+    execute_sql(sql_script=script, pc=pc)
+    query_list = get_quix_data(sql_script=f'select * from {storage_table}', pc=pc)
+    return query_list
 
 # one of the report's outputs is serp features, which are coded as a serial numbers. The function checks which serp features are there in order to create mapping
 def inspect_features(row, symbol):
@@ -179,3 +187,20 @@ def get_last_update_date(table, pc):
 # load data into bq table
 def load_db(data_frame, credentials, table, method):
     data_frame.to_gbq(credentials=credentials, destination_table=f'{table}', if_exists=method, chunksize=10000)
+   
+# set report parameters from the global parameter file
+def get_report_parameters(parameters_file, report_type):
+    dimension = parameters_file['reports'][report_type]['dimension']
+    service_url = parameters_file['reports'][report_type]['service_url']
+    call_type = parameters_file['reports'][report_type]['call_type']
+    features = parameters_file['reports'][report_type]['features']
+    feature_mapping = parameters_file['reports'][report_type]['feature_mapping']
+    bq_table = parameters_file['reports'][report_type]['bq_table']
+    return dimension, service_url, call_type, features, feature_mapping, bq_table
+
+# set table parameters from the global parameter file
+def get_table_parameters(parameters_file, table_type):
+    keyword = parameters_file['data_requirements'][table_type]['keyword']
+    url = parameters_file['data_requirements'][table_type]['url']
+    database = parameters_file['data_requirements'][table_type]['database']
+    return keyword, url, database
