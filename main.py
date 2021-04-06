@@ -1,125 +1,85 @@
 #################
 #### Imports ####
 #################
+import os.path
+from pathlib import Path
 
-from datetime import datetime
+from ba_infra.presto_connection import WixPrestoConnection
+from google.oauth2 import service_account
 
 import functions as func
 
-###########################
-#### Global Parameters ####
-###########################
+#####################
+####  Parameters ####
+#####################
+DATA_FOLDER = Path(os.getcwd())
 
-api_key = # Upon production the key will be taken from airflow storage, during development the key is taken from text file
+BQ_CREDENTIALS = service_account.Credentials.from_service_account_file(DATA_FOLDER / "key.json", scopes=["https://www.googleapis.com/auth/cloud-platform"])
+API_KEY = func.read_json(path_file=DATA_FOLDER / "key_api.json")['api_key']
+
+GLOBAL_PARAMETERS = func.read_json(path_file=DATA_FOLDER / "configuration.json")
 
 # Set dates
-date_mid_month = func.mid_month()   # Data updated two weeks after the end of the month, for the previous month
-current_time = datetime.now()
+DATE_MID_MONTH = func.mid_month()   # Data updated two weeks after the end of the month, for the previous month
 
-# Update input tables
-script = func.update_input_tables()
-func.execute_sql(sql_script=script)
+# Set Tables
+GOOGLE_SHEET_KW_TABLE, GOOGLE_SHEET_URL_TABLE, GOOGLE_SHEET_DB_TABLE = func.get_table_parameters(parameters_file=GLOBAL_PARAMETERS, table_type='google_sheets')
+PRESTO_KW_TABLE, PRESTO_URL_TABLE, PRESTO_DB_TABLE = func.get_table_parameters(parameters_file=GLOBAL_PARAMETERS, table_type='presto_tables')
 
-# Get input tables
-db_list = func.get_quix_data('select * from sandbox.itaib.seo_databases_semrush').database.tolist()
-kw_list = func.get_quix_data('select * from sandbox.itaib.seo_kw_semrush limit 2').keyword.tolist()  # todo: remove 'limit 10' when script is ready
-url_list = func.get_quix_data('select * from sandbox.itaib.seo_url_semrush limit 2').url.tolist()  # todo: remove 'limit 10' when script is ready
+# Set query parameters
+pc = WixPrestoConnection()
+KW_LIST = func.get_query_parameters(input_table=GOOGLE_SHEET_KW_TABLE, storage_table=PRESTO_KW_TABLE, pc=pc)
+URL_LIST = func.get_query_parameters(input_table=GOOGLE_SHEET_URL_TABLE, storage_table=PRESTO_URL_TABLE, pc=pc)
+DB_LIST = func.get_query_parameters(input_table=GOOGLE_SHEET_DB_TABLE, storage_table=PRESTO_DB_TABLE, pc=pc)
 
-# Last update dates on final tables
-last_update_date_semrush_kw_traffic = func.get_last_update_date(table='sandbox.itaib.semrush_kw_traffic')
-last_update_date_semrush_url_backlinks = func.get_last_update_date(table='sandbox.itaib.semrush_url_backlinks')
-last_update_date_semrush_kw_serp_features_map = func.get_last_update_date(table='sandbox.itaib.semrush_kw_serp_features_map')
-
-#########################
-#### Request Reports ####
-#########################
-
-#### Keyword Reports ####
-
-# Set Local Parameters
-dimension = 'phrase'
-service_url = 'https://api.semrush.com'
-
-## Table 1.1 - Keyword Overview ##
-
-# Set Local Parameters
-call_type = 'phrase_this'
-features = 'Nq'
+###################################
+#### Report - Keyword Overview ####
+###################################
+# Get Parameters
+DIMENSION_KEYWORD_OVERVIEW, SERVICE_URL_KEYWORD_OVERVIEW, CALL_TYPE_KEYWORD_OVERVIEW, FEATURES_KEYWORD_OVERVIEW, SERP_FEATURES_MAP_KEYWORD_OVERVIEW, BQ_DELTA_TABLE_SEMRUSH_KW_TRAFFIC = func.get_report_parameters(parameters_file=GLOBAL_PARAMETERS, report_type='report_keyword_overview')
+LAST_UPDATE_DATE_SEMRUSH_KW_TRAFFIC = func.get_last_update_date(table=f'marketing_internal_bq.{BQ_DELTA_TABLE_SEMRUSH_KW_TRAFFIC}', pc=pc)
 # Request Data
-final_df_phrase_this = func.get_data(dimension=dimension, call_type=call_type, features=features, service_url=service_url,
-                                     api_key=api_key, date_mid_month=date_mid_month, kw_list=kw_list, db_list=db_list,
-                                     url_list=url_list, current_time=current_time, last_update_date=last_update_date_semrush_kw_traffic)
-## Table 1.2 - Organic Results ##
-
-# Set Local Parameters
-call_type = 'phrase_organic'
-features = 'Dn,Ur,Fp'
-serp_features_map = {
-    '0': 'instant_answer',
-    '6':  'site_links',
-    '11': 'featured_snippet',
-    '22': 'faq',
-}
-# Request Data
-final_df_phrase_organic = func.get_data(dimension=dimension, call_type=call_type, features=features, service_url=service_url,
-                                        api_key=api_key, date_mid_month=date_mid_month, kw_list=kw_list, db_list=db_list,
-                                        url_list=url_list, current_time=current_time, last_update_date=last_update_date_semrush_url_backlinks)
+final_df_phrase_this = func.get_phrase_data(dimension=DIMENSION_KEYWORD_OVERVIEW, call_type=CALL_TYPE_KEYWORD_OVERVIEW,
+                                            features=FEATURES_KEYWORD_OVERVIEW, service_url=SERVICE_URL_KEYWORD_OVERVIEW,
+                                            api_key=API_KEY, date_mid_month=DATE_MID_MONTH, kw_list=KW_LIST, db_list=DB_LIST,
+                                            last_update_date=LAST_UPDATE_DATE_SEMRUSH_KW_TRAFFIC)
 # Organize Data
-for key, value in serp_features_map.items():
+final_df_phrase_this = final_df_phrase_this.rename(columns={'Search Volume': 'search_volume'})  # bq can't accept 'Search Volume' as column name
+# Load to bq
+func.load_db(data_frame=final_df_phrase_this, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_TRAFFIC, method='append')
+
+##############################
+## Report - Organic Results ##
+##############################
+# Get Parameters
+DIMENSION_ORGANIC_RESULTS, SERVICE_URL_ORGANIC_RESULTS, CALL_TYPE_ORGANIC_RESULTS, FEATURES_ORGANIC_RESULTS, SERP_FEATURES_MAP_ORGANIC_RESULTS, BQ_DELTA_TABLE_SEMRUSH_URL_BACKLINKS = func.get_report_parameters(parameters_file=GLOBAL_PARAMETERS, report_type='report_organic_results')
+LAST_UPDATE_DATE_SEMRUSH_URL_BACKLINKS = func.get_last_update_date(table=f'marketing_internal_bq.{BQ_DELTA_TABLE_SEMRUSH_URL_BACKLINKS}', pc=pc)
+# Request Data
+final_df_phrase_organic = func.get_phrase_data(dimension=DIMENSION_ORGANIC_RESULTS, call_type=CALL_TYPE_ORGANIC_RESULTS,
+                                               features=FEATURES_ORGANIC_RESULTS, service_url=SERVICE_URL_ORGANIC_RESULTS,
+                                               api_key=API_KEY, date_mid_month=DATE_MID_MONTH, kw_list=KW_LIST, db_list=DB_LIST,
+                                               last_update_date=LAST_UPDATE_DATE_SEMRUSH_URL_BACKLINKS)
+# Organize Data
+for key, value in SERP_FEATURES_MAP_ORGANIC_RESULTS.items():
     symbol = '^' + str(key) + '$'
     func.map_features(df=final_df_phrase_organic, new_column=value, symbol=symbol, old_column='SERP Features')
 del final_df_phrase_organic['SERP Features']
+# Load to bq
+func.load_db(data_frame=final_df_phrase_organic, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_URL_BACKLINKS, method='append')
 
-#### Backlinks Reports ####
-
-# Set Local Parameters
-dimension = 'url'
-service_url = 'https://api.semrush.com/analytics/v1/'
-
-## Table 2 - Indexed Pages ##
-
-# Set Local Parameters
-call_type = 'backlinks_pages'
-features = 'source_url,backlinks_num,domains_num,last_seen'
+################################
+#### Report - Indexed Pages ####
+################################
+# Get Parameters
+DIMENSION_INDEXED_PAGES, SERVICE_URL_INDEXED_PAGES, CALL_TYPE_INDEXED_PAGES, FEATURES_INDEXED_PAGES, SERP_FEATURES_MAP_INDEXED_PAGES, BQ_DELTA_TABLE_SEMRUSH_KW_SERP_FEATURES_MAP = func.get_report_parameters(parameters_file=GLOBAL_PARAMETERS, report_type='report_indexed_pages')
+LAST_UPDATE_DATE_SEMRUSH_KW_SERP_FEATURES_MAP = func.get_last_update_date(table=f'marketing_internal_bq.{BQ_DELTA_TABLE_SEMRUSH_KW_SERP_FEATURES_MAP}', pc=pc)
 # Request Data
-final_df_backlinks_pages = func.get_data(dimension=dimension, call_type=call_type, features=features, service_url=service_url,
-                                         api_key=api_key, date_mid_month=date_mid_month, kw_list=kw_list, db_list=db_list,
-                                         url_list=url_list, current_time=current_time, last_update_date=last_update_date_semrush_kw_serp_features_map)
+final_df_backlinks_pages = func.get_url_data(dimension=DIMENSION_INDEXED_PAGES, call_type=CALL_TYPE_INDEXED_PAGES,
+                                             features=FEATURES_INDEXED_PAGES, service_url=SERVICE_URL_INDEXED_PAGES,
+                                             api_key=API_KEY, url_list=URL_LIST, last_update_date=LAST_UPDATE_DATE_SEMRUSH_KW_SERP_FEATURES_MAP)
 # Organize Data
 del final_df_backlinks_pages['last_seen']
+# Load to bq
+func.load_db(data_frame=final_df_backlinks_pages, credentials=BQ_CREDENTIALS, table=BQ_DELTA_TABLE_SEMRUSH_KW_SERP_FEATURES_MAP, method='append')
 
-#####################
-#### Save Tabels ####
-#####################
 
-date_types_phrase_this = {
-    'database': 'varchar',
-    'phrase': 'varchar',
-    'traffic': 'integer',
-    'display_date': 'varchar',
-    'time_updated': 'varchar'
-}
-func.create_presto_table(table_name='sandbox.itaib.semrush_kw_traffic', df=final_df_phrase_this, col_dict=date_types_phrase_this, state='append')
-
-date_types_phrase_organic = {
-    'keyword': 'varchar',
-    'database': 'varchar',
-    'display_date': 'varchar',
-    'Domain': 'varchar',
-    'Url': 'varchar',
-    'instant_answer': 'integer',
-    'site_links': 'integer',
-    'featured_snippet': 'integer',
-    'faq': 'integer',
-    'time_updated': 'varchar'
-}
-func.create_presto_table(table_name='sandbox.itaib.semrush_url_backlinks', df=final_df_phrase_organic, col_dict=date_types_phrase_organic, state='append')
-
-date_types_backlinks_pages = {
-    'source_url': 'varchar',
-    'backlinks_num': 'integer',
-    'domains_num': 'integer',
-    'time_updated': 'varchar',
-    'last_seen_date': 'varchar'
-}
-func.create_presto_table(table_name='sandbox.itaib.semrush_kw_serp_features_map', df=final_df_backlinks_pages, col_dict=date_types_backlinks_pages, state='append')
